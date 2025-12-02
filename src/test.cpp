@@ -1,7 +1,7 @@
-#include <cstdio>
+#include <stdio.h>
 
-extern "C" int foo()
-{       
-	printf("Thit is a test shared library\n");
-	return 0;
+int foo()
+{
+    printf("Thit is a test shared library\n");
+    return 0;
 }

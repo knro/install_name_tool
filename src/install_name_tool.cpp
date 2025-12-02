@@ -2,14 +2,14 @@
  * Copyright (c) 2001 Apple Computer, Inc. All rights reserved.
  *
  * @APPLE_LICENSE_HEADER_START@
- * 
+ *
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
  * Version 2.0 (the 'License'). You may not use this file except in
  * compliance with the License. Please obtain a copy of the License at
  * http://www.opensource.apple.com/apsl/ and read it before using this
  * file.
- * 
+ *
  * The Original Code and all software distributed under the License are
  * distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
  * EXPRESS OR IMPLIED, AND APPLE HEREBY DISCLAIMS ALL SUCH WARRANTIES,
@@ -17,7 +17,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT.
  * Please see the License for the specific language governing rights and
  * limitations under the License.
- * 
+ *
  * @APPLE_LICENSE_HEADER_END@
  */
 #include <cstdio>
@@ -60,7 +60,8 @@ static void update_load_commands(
 static char *id = NULL;
 
 /* the arguments to the -change options */
-struct changes {
+struct changes
+{
     char *cold;
     char *cnew;
 };
@@ -68,7 +69,8 @@ static struct changes *changes = NULL;
 static uint32_t nchanges = 0;
 
 /* the arguments to the -rpath options */
-struct rpaths {
+struct rpaths
+{
     char *cold;
     char *cnew;
     bool found;
@@ -77,14 +79,16 @@ static struct rpaths *rpaths = NULL;
 static uint32_t nrpaths = 0;
 
 /* the arguments to the -add_rpath options */
-struct add_rpaths {
+struct add_rpaths
+{
     char *cnew;
 };
 static struct add_rpaths *add_rpaths = NULL;
 static uint32_t nadd_rpaths = 0;
 
 /* the arguments to the -delete_rpath options */
-struct delete_rpaths {
+struct delete_rpaths
+{
     char *cold;
     bool found;
 };
@@ -109,8 +113,8 @@ const char *version = "https://github.com/dmikushin/install_name_tool";
 
 extern "C"
 {
-	int patchElfCmdline(int argc, char** argv);
-	int patchElfReadRpath(const char* filename, char* rpath, unsigned int* szrpath);
+    int patchElfCmdline(int argc, char** argv);
+    int patchElfReadRpath(const char* filename, char* rpath, unsigned int* szrpath);
 }
 
 /*
@@ -124,7 +128,7 @@ extern "C"
  *
  * The "-change old new" option changes the "old" install name to the "new"
  * install name if found in the binary.
- * 
+ *
  * The "-rpath old new" option changes the "old" path name in the rpath to
  * the "new" path name in an LC_RPATH load command in the binary.
  *
@@ -138,9 +142,9 @@ extern "C"
  */
 int
 main(
-int argc,
-char **argv,
-char **envp)
+    int argc,
+    char **argv,
+    char **envp)
 {
     int i, j;
     struct arch *archs;
@@ -148,276 +152,341 @@ char **envp)
     char *input;
     char *output;
 
-	output = NULL;
-	progname = argv[0];
-	input = NULL;
-	archs = NULL;
-	narchs = 0;
-	for(i = 1; i < argc; i++){
+    output = NULL;
+    progname = argv[0];
+    input = NULL;
+    archs = NULL;
+    narchs = 0;
+    for(i = 1; i < argc; i++)
+    {
 #ifdef OUTPUT_OPTION
-	    if(strcmp(argv[i], "-o") == 0){
-		if(i + 1 == argc){
-		    fprintf(stderr, "missing argument to: %s option", argv[i]);
-		    usage();
-		}
-		if(output != NULL){
-		    fprintf(stderr, "more than one: %s option specified", argv[i]);
-		    usage();
-		}
-		output = argv[i+1];
-		i++;
-	    }
-	    else
+        if(strcmp(argv[i], "-o") == 0)
+        {
+            if(i + 1 == argc)
+            {
+                fprintf(stderr, "missing argument to: %s option", argv[i]);
+                usage();
+            }
+            if(output != NULL)
+            {
+                fprintf(stderr, "more than one: %s option specified", argv[i]);
+                usage();
+            }
+            output = argv[i + 1];
+            i++;
+        }
+        else
 #endif /* OUTPUT_OPTION */
-	    if(strcmp(argv[i], "-id") == 0){
-		if(i + 1 == argc){
-		    fprintf(stderr, "missing argument to: %s option", argv[i]);
-		    usage();
-		}
-		if(id != NULL){
-		    fprintf(stderr, "more than one: %s option specified", argv[i]);
-		    usage();
-		}
-		id = argv[i+1];
-		i++;
-	    }
-	    else if(strcmp(argv[i], "-change") == 0){
-		if(i + 2 >= argc){
-		    fprintf(stderr, "missing argument(s) to: %s option", argv[i]);
-		    usage();
-		}
-		changes = (struct changes*)realloc(changes,
-				     sizeof(struct changes) * (nchanges + 1));
-		changes[nchanges].cold = argv[i+1];
-		changes[nchanges].cnew = argv[i+2];
-		nchanges += 1;
-		i += 2;
-	    }
-	    else if(strcmp(argv[i], "-rpath") == 0){
-		if(i + 2 >= argc){
-		    fprintf(stderr, "missing argument(s) to: %s option", argv[i]);
-		    usage();
-		}
-		for(j = 0; j < nrpaths; j++){
-		    if(strcmp(rpaths[j].cold, argv[i+1]) == 0){
-		        if(strcmp(rpaths[j].cnew, argv[i+2]) == 0){
-			    fprintf(stderr, "\"-rpath %s %s\" specified more than once",
-				   argv[i+1], argv[i+2]);
-			    usage();
-			}
-			fprintf(stderr, "can't specify both \"-rpath %s %s\" and "
-			      "\"-rpath %s %s\"", rpaths[j].cold, rpaths[j].cnew,
-			      argv[i+1], argv[i+2]);
-			usage();
-		    }
-		    if(strcmp(rpaths[j].cnew, argv[i+1]) == 0 ||
-		       strcmp(rpaths[j].cold, argv[i+2]) == 0 ||
-		       strcmp(rpaths[j].cnew, argv[i+2]) == 0){
-			fprintf(stderr, "can't specify both \"-rpath %s %s\" and "
-			      "\"-rpath %s %s\"", rpaths[j].cold, rpaths[j].cnew,
-			      argv[i+1], argv[i+2]);
-			usage();
-		    }
-		}
-		for(j = 0; j < nadd_rpaths; j++){
-		    if(strcmp(add_rpaths[j].cnew, argv[i+1]) == 0 ||
-		       strcmp(add_rpaths[j].cnew, argv[i+2]) == 0){
-			fprintf(stderr, "can't specify both \"-add_rpath %s\" "
-			      "and \"-rpath %s %s\"", add_rpaths[j].cnew,
-			      argv[i+1], argv[i+2]);
-			usage();
-		    }
-		}
-		for(j = 0; j < ndelete_rpaths; j++){
-		    if(strcmp(delete_rpaths[j].cold, argv[i+1]) == 0 ||
-		       strcmp(delete_rpaths[j].cold, argv[i+2]) == 0){
-			fprintf(stderr, "can't specify both \"-delete_rpath %s\" "
-			      "and \"-rpath %s %s\"", delete_rpaths[j].cold,
-			      argv[i+1], argv[i+2]);
-			usage();
-		    }
-		}
-		rpaths = (struct rpaths*)realloc(rpaths,
-				    sizeof(struct rpaths) * (nrpaths + 1));
-		rpaths[nrpaths].cold = argv[i+1];
-		rpaths[nrpaths].cnew = argv[i+2];
-		rpaths[nrpaths].found = false;
-		nrpaths += 1;
-		i += 2;
-	    }
-	    else if(strcmp(argv[i], "-add_rpath") == 0){
-		if(i + 1 == argc){
-		    fprintf(stderr, "missing argument(s) to: %s option", argv[i]);
-		    usage();
-		}
-		for(j = 0; j < nadd_rpaths; j++){
-		    if(strcmp(add_rpaths[j].cnew, argv[i+1]) == 0){
-			fprintf(stderr, "\"-add_rpath %s\" specified more than once",
-			      add_rpaths[j].cnew);
-			usage();
-		    }
-		}
-		for(j = 0; j < nrpaths; j++){
-		    if(strcmp(rpaths[j].cold, argv[i+1]) == 0 ||
-		       strcmp(rpaths[j].cnew, argv[i+1]) == 0){
-			fprintf(stderr, "can't specify both \"-rpath %s %s\" and "
-			      "\"-add_rpath %s\"", rpaths[j].cold, rpaths[j].cnew,
-			      argv[i+1]);
-			usage();
-		    }
-		}
-		for(j = 0; j < ndelete_rpaths; j++){
-		    if(strcmp(delete_rpaths[j].cold, argv[i+1]) == 0){
-			fprintf(stderr, "can't specify both \"-delete_rpath %s\" "
-			      "and \"-add_rpath %s\"", delete_rpaths[j].cold,
-			      argv[i+1]);
-			usage();
-		    }
-		}
-		add_rpaths = (struct add_rpaths*)realloc(add_rpaths,
-				sizeof(struct add_rpaths) * (nadd_rpaths + 1));
-		add_rpaths[nadd_rpaths].cnew = argv[i+1];
-		nadd_rpaths += 1;
-		i += 1;
-	    }
-	    else if(strcmp(argv[i], "-delete_rpath") == 0){
-		if(i + 1 == argc){
-		    fprintf(stderr, "missing argument(s) to: %s option", argv[i]);
-		    usage();
-		}
-		for(j = 0; j < ndelete_rpaths; j++){
-		    if(strcmp(delete_rpaths[j].cold, argv[i+1]) == 0){
-			fprintf(stderr, "\"-delete_rpath %s\" specified more than once",
-			      delete_rpaths[j].cold);
-			usage();
-		    }
-		}
-		for(j = 0; j < nrpaths; j++){
-		    if(strcmp(rpaths[j].cold, argv[i+1]) == 0 ||
-		       strcmp(rpaths[j].cnew, argv[i+1]) == 0){
-			fprintf(stderr, "can't specify both \"-rpath %s %s\" and "
-			      "\"-delete_rpath %s\"", rpaths[j].cold,
-			      rpaths[j].cnew, argv[i+1]);
-			usage();
-		    }
-		}
-		for(j = 0; j < nadd_rpaths; j++){
-		    if(strcmp(add_rpaths[j].cnew, argv[i+1]) == 0){
-			fprintf(stderr, "can't specify both \"-add_rpath %s\" "
-			      "and \"-delete_rpath %s\"", add_rpaths[j].cnew,
-			      argv[i+1]);
-			usage();
-		    }
-		}
-		delete_rpaths = (struct delete_rpaths*)realloc(delete_rpaths,
-				sizeof(struct delete_rpaths) *
-					(ndelete_rpaths + 1));
-		delete_rpaths[ndelete_rpaths].cold = argv[i+1];
-		delete_rpaths[ndelete_rpaths].found = false;
-		ndelete_rpaths += 1;
-		i += 1;
-	    }
-	    else{
-		if(input != NULL){
-		    fprintf(stderr, "more than one input file specified (%s and %s)",
-			  argv[i], input);
-		    usage();
-		}
-		input = argv[i];
-	    }
-	}
-	if(input == NULL || (id == NULL && nchanges == 0 && nrpaths == 0 &&
-	   nadd_rpaths == 0 && ndelete_rpaths == 0))
-	    usage();
+            if(strcmp(argv[i], "-id") == 0)
+            {
+                if(i + 1 == argc)
+                {
+                    fprintf(stderr, "missing argument to: %s option", argv[i]);
+                    usage();
+                }
+                if(id != NULL)
+                {
+                    fprintf(stderr, "more than one: %s option specified", argv[i]);
+                    usage();
+                }
+                id = argv[i + 1];
+                i++;
+            }
+            else if(strcmp(argv[i], "-change") == 0)
+            {
+                if(i + 2 >= argc)
+                {
+                    fprintf(stderr, "missing argument(s) to: %s option", argv[i]);
+                    usage();
+                }
+                changes = (struct changes*)realloc(changes,
+                                                   sizeof(struct changes) * (nchanges + 1));
+                changes[nchanges].cold = argv[i + 1];
+                changes[nchanges].cnew = argv[i + 2];
+                nchanges += 1;
+                i += 2;
+            }
+            else if(strcmp(argv[i], "-rpath") == 0)
+            {
+                if(i + 2 >= argc)
+                {
+                    fprintf(stderr, "missing argument(s) to: %s option", argv[i]);
+                    usage();
+                }
+                for(j = 0; j < nrpaths; j++)
+                {
+                    if(strcmp(rpaths[j].cold, argv[i + 1]) == 0)
+                    {
+                        if(strcmp(rpaths[j].cnew, argv[i + 2]) == 0)
+                        {
+                            fprintf(stderr, "\"-rpath %s %s\" specified more than once",
+                                    argv[i + 1], argv[i + 2]);
+                            usage();
+                        }
+                        fprintf(stderr, "can't specify both \"-rpath %s %s\" and "
+                                        "\"-rpath %s %s\"", rpaths[j].cold, rpaths[j].cnew,
+                                argv[i + 1], argv[i + 2]);
+                        usage();
+                    }
+                    if(strcmp(rpaths[j].cnew, argv[i + 1]) == 0 ||
+                            strcmp(rpaths[j].cold, argv[i + 2]) == 0 ||
+                            strcmp(rpaths[j].cnew, argv[i + 2]) == 0)
+                    {
+                        fprintf(stderr, "can't specify both \"-rpath %s %s\" and "
+                                        "\"-rpath %s %s\"", rpaths[j].cold, rpaths[j].cnew,
+                                argv[i + 1], argv[i + 2]);
+                        usage();
+                    }
+                }
+                for(j = 0; j < nadd_rpaths; j++)
+                {
+                    if(strcmp(add_rpaths[j].cnew, argv[i + 1]) == 0 ||
+                            strcmp(add_rpaths[j].cnew, argv[i + 2]) == 0)
+                    {
+                        fprintf(stderr, "can't specify both \"-add_rpath %s\" "
+                                        "and \"-rpath %s %s\"", add_rpaths[j].cnew,
+                                argv[i + 1], argv[i + 2]);
+                        usage();
+                    }
+                }
+                for(j = 0; j < ndelete_rpaths; j++)
+                {
+                    if(strcmp(delete_rpaths[j].cold, argv[i + 1]) == 0 ||
+                            strcmp(delete_rpaths[j].cold, argv[i + 2]) == 0)
+                    {
+                        fprintf(stderr, "can't specify both \"-delete_rpath %s\" "
+                                        "and \"-rpath %s %s\"", delete_rpaths[j].cold,
+                                argv[i + 1], argv[i + 2]);
+                        usage();
+                    }
+                }
+                rpaths = (struct rpaths*)realloc(rpaths,
+                                                 sizeof(struct rpaths) * (nrpaths + 1));
+                rpaths[nrpaths].cold = argv[i + 1];
+                rpaths[nrpaths].cnew = argv[i + 2];
+                rpaths[nrpaths].found = false;
+                nrpaths += 1;
+                i += 2;
+            }
+            else if(strcmp(argv[i], "-add_rpath") == 0)
+            {
+                if(i + 1 == argc)
+                {
+                    fprintf(stderr, "missing argument(s) to: %s option", argv[i]);
+                    usage();
+                }
+                for(j = 0; j < nadd_rpaths; j++)
+                {
+                    if(strcmp(add_rpaths[j].cnew, argv[i + 1]) == 0)
+                    {
+                        fprintf(stderr, "\"-add_rpath %s\" specified more than once",
+                                add_rpaths[j].cnew);
+                        usage();
+                    }
+                }
+                for(j = 0; j < nrpaths; j++)
+                {
+                    if(strcmp(rpaths[j].cold, argv[i + 1]) == 0 ||
+                            strcmp(rpaths[j].cnew, argv[i + 1]) == 0)
+                    {
+                        fprintf(stderr, "can't specify both \"-rpath %s %s\" and "
+                                        "\"-add_rpath %s\"", rpaths[j].cold, rpaths[j].cnew,
+                                argv[i + 1]);
+                        usage();
+                    }
+                }
+                for(j = 0; j < ndelete_rpaths; j++)
+                {
+                    if(strcmp(delete_rpaths[j].cold, argv[i + 1]) == 0)
+                    {
+                        fprintf(stderr, "can't specify both \"-delete_rpath %s\" "
+                                        "and \"-add_rpath %s\"", delete_rpaths[j].cold,
+                                argv[i + 1]);
+                        usage();
+                    }
+                }
+                add_rpaths = (struct add_rpaths*)realloc(add_rpaths,
+                             sizeof(struct add_rpaths) * (nadd_rpaths + 1));
+                add_rpaths[nadd_rpaths].cnew = argv[i + 1];
+                nadd_rpaths += 1;
+                i += 1;
+            }
+            else if(strcmp(argv[i], "-delete_rpath") == 0)
+            {
+                if(i + 1 == argc)
+                {
+                    fprintf(stderr, "missing argument(s) to: %s option", argv[i]);
+                    usage();
+                }
+                for(j = 0; j < ndelete_rpaths; j++)
+                {
+                    if(strcmp(delete_rpaths[j].cold, argv[i + 1]) == 0)
+                    {
+                        fprintf(stderr, "\"-delete_rpath %s\" specified more than once",
+                                delete_rpaths[j].cold);
+                        usage();
+                    }
+                }
+                for(j = 0; j < nrpaths; j++)
+                {
+                    if(strcmp(rpaths[j].cold, argv[i + 1]) == 0 ||
+                            strcmp(rpaths[j].cnew, argv[i + 1]) == 0)
+                    {
+                        fprintf(stderr, "can't specify both \"-rpath %s %s\" and "
+                                        "\"-delete_rpath %s\"", rpaths[j].cold,
+                                rpaths[j].cnew, argv[i + 1]);
+                        usage();
+                    }
+                }
+                for(j = 0; j < nadd_rpaths; j++)
+                {
+                    if(strcmp(add_rpaths[j].cnew, argv[i + 1]) == 0)
+                    {
+                        fprintf(stderr, "can't specify both \"-add_rpath %s\" "
+                                        "and \"-delete_rpath %s\"", add_rpaths[j].cnew,
+                                argv[i + 1]);
+                        usage();
+                    }
+                }
+                delete_rpaths = (struct delete_rpaths*)realloc(delete_rpaths,
+                                sizeof(struct delete_rpaths) *
+                                (ndelete_rpaths + 1));
+                delete_rpaths[ndelete_rpaths].cold = argv[i + 1];
+                delete_rpaths[ndelete_rpaths].found = false;
+                ndelete_rpaths += 1;
+                i += 1;
+            }
+            else
+            {
+                if(input != NULL)
+                {
+                    fprintf(stderr, "more than one input file specified (%s and %s)",
+                            argv[i], input);
+                    usage();
+                }
+                input = argv[i];
+            }
+    }
+    if(input == NULL || (id == NULL && nchanges == 0 && nrpaths == 0 &&
+                         nadd_rpaths == 0 && ndelete_rpaths == 0))
+        usage();
 
-	for (int i = 0; i < nchanges; i++){
-		const char* argv[] = { "", "--replace-needed", changes[i].cold, changes[i].cnew, input, NULL };
-		patchElfCmdline(sizeof(argv) / sizeof(argv[0]) - 1, const_cast<char**>(argv));
-	}
-	if (id){
-		const char* argv[] = { "", "--set-soname", id, input, NULL };
-		patchElfCmdline(sizeof(argv) / sizeof(argv[0]) - 1, const_cast<char**>(argv));
-	}
+    for (int i = 0; i < nchanges; i++)
+    {
+        const char* argv[] = { "", "--replace-needed", changes[i].cold, changes[i].cnew, input, NULL };
+        patchElfCmdline(sizeof(argv) / sizeof(argv[0]) - 1, const_cast<char**>(argv));
+    }
+    if (id)
+    {
+        const char* argv[] = { "", "--set-soname", id, input, NULL };
+        patchElfCmdline(sizeof(argv) / sizeof(argv[0]) - 1, const_cast<char**>(argv));
+    }
 
-	unsigned int szrpath = 0;
-	patchElfReadRpath(input, NULL, &szrpath);
-	vector<char> vrpath(szrpath);
-	patchElfReadRpath(input, reinterpret_cast<char*>(&vrpath[0]), NULL);
-	string rpath(reinterpret_cast<char*>(&vrpath[0]), vrpath.size());
+    unsigned int szrpath = 0;
+    patchElfReadRpath(input, NULL, &szrpath);
+    string rpath;
+    if (szrpath > 0)
+    {
+        vector<char> vrpath(szrpath);
+        patchElfReadRpath(input, vrpath.data(), NULL);
+        // Find the actual string length (null-terminated)
+        size_t actual_len = 0;
+        for (size_t i = 0; i < vrpath.size(); i++)
+        {
+            if (vrpath[i] == '\0')
+            {
+                actual_len = i;
+                break;
+            }
+        }
+        if (actual_len == 0 && vrpath.size() > 0)
+            actual_len = vrpath.size();
+        rpath = string(vrpath.data(), actual_len);
+    }
 
-	bool modified = false;
+    bool modified = false;
 
-	for (int i = 0; i < nrpaths; i++){
-		stringstream cold;
-		cold << "(^|:)";
-		cold << rpaths[i].cold;
-		cold << "(:|$)";
- 
- 		stringstream cnew;
- 		cnew << "$1";
- 		cnew << rpaths[i].cnew;
- 		cnew << "$2";
+    for (int i = 0; i < nrpaths; i++)
+    {
+        stringstream cold;
+        cold << "(^|:)";
+        cold << rpaths[i].cold;
+        cold << "(:|$)";
 
-		while (1)
-		{
-			string rpathNew = std::regex_replace(rpath, std::regex(cold.str()), cnew.str());
-			if (rpathNew != rpath){
-				rpath = rpathNew;
-				modified = true;
-			}
-			else break;
-		}
-	}
+        stringstream cnew;
+        cnew << "$1";
+        cnew << rpaths[i].cnew;
+        cnew << "$2";
 
-	for (int i = 0; i < nadd_rpaths; i++){
-		if (rpath.length()) rpath.append(":");
-		rpath.append(add_rpaths[i].cnew);
-		modified = true;
-	}
+        while (1)
+        {
+            string rpathNew = std::regex_replace(rpath, std::regex(cold.str()), cnew.str());
+            if (rpathNew != rpath)
+            {
+                rpath = rpathNew;
+                modified = true;
+            }
+            else break;
+        }
+    }
 
-	for (int i = 0; i < ndelete_rpaths; i++){
-		stringstream cold;
-		cold << "(^|:)";
-		cold << delete_rpaths[i].cold;
-		cold << "(:|$)";
- 
- 		stringstream cnew;
- 		cnew << "$1";
- 		cnew << "$2";
+    for (int i = 0; i < nadd_rpaths; i++)
+    {
+        if (rpath.length()) rpath.append(":");
+        rpath.append(add_rpaths[i].cnew);
+        modified = true;
+    }
 
-		while (1)
-		{
-			string rpathNew = std::regex_replace(rpath, std::regex(cold.str()), cnew.str());
-			if (rpathNew != rpath){
-				rpath = rpathNew;
-				modified = true;
-			}
-			else break;
-		}
-	}
-	
-	if (modified){
-	
-		// Remove duplicate colons.
-		while (1)
-		{
-			string rpathNew = std::regex_replace(rpath, std::regex("::"), ":");
-			if (rpathNew != rpath){
-				rpath = rpathNew;
-				modified = true;
-			}
-			else break;
-		}
-		
-		// If only a single colon remaining, pass an empty RPATH.
-		if (rpath == ":") rpath = "";
-	
-		const char* crpath = rpath.c_str();
-		const char* argv[] = { "", "--force-rpath", "--set-rpath", crpath, input, NULL };
-		patchElfCmdline(sizeof(argv) / sizeof(argv[0]) - 1, const_cast<char**>(argv));
-	}
+    for (int i = 0; i < ndelete_rpaths; i++)
+    {
+        stringstream cold;
+        cold << "(^|:)";
+        cold << delete_rpaths[i].cold;
+        cold << "(:|$)";
 
-	return(EXIT_SUCCESS);
+        stringstream cnew;
+        cnew << "$1";
+        cnew << "$2";
+
+        while (1)
+        {
+            string rpathNew = std::regex_replace(rpath, std::regex(cold.str()), cnew.str());
+            if (rpathNew != rpath)
+            {
+                rpath = rpathNew;
+                modified = true;
+            }
+            else break;
+        }
+    }
+
+    if (modified)
+    {
+
+        // Remove duplicate colons.
+        while (1)
+        {
+            string rpathNew = std::regex_replace(rpath, std::regex("::"), ":");
+            if (rpathNew != rpath)
+            {
+                rpath = rpathNew;
+                modified = true;
+            }
+            else break;
+        }
+
+        // Remove leading colon
+        rpath = std::regex_replace(rpath, std::regex("^:"), "");
+
+        // Remove trailing colon
+        rpath = std::regex_replace(rpath, std::regex(":$"), "");
+
+        const char* crpath = rpath.c_str();
+        const char* argv[] = { "", "--force-rpath", "--set-rpath", crpath, input, NULL };
+        patchElfCmdline(sizeof(argv) / sizeof(argv[0]) - 1, const_cast<char**>(argv));
+    }
+
+    return(EXIT_SUCCESS);
 }
 
 /*
@@ -426,15 +495,14 @@ char **envp)
 static
 void
 usage(
-void)
+    void)
 {
-	fprintf(stderr, "Usage: %s [-change old new] ... [-rpath old new] ... "
-			"[-add_rpath new] ... [-delete_rpath old] ... "
-			"[-id name] input"
+    fprintf(stderr, "Usage: %s [-change old new] ... [-rpath old new] ... "
+                    "[-add_rpath new] ... [-delete_rpath old] ... "
+                    "[-id name] input"
 #ifdef OUTPUT_OPTION
-		" [-o output]"
+                    " [-o output]"
 #endif /* OUTPUT_OPTION */
-		"\n", progname);
-	exit(EXIT_FAILURE);
+                    "\n", progname);
+    exit(EXIT_FAILURE);
 }
-

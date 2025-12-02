@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.20)
 
 project(install_name_tool)
 
@@ -15,6 +15,8 @@ target_include_directories(patchelf PRIVATE include)
 target_compile_definitions(patchelf PRIVATE PATCHELF)
 
 add_library(test SHARED "src/test.cpp")
+set_source_files_properties("src/test.cpp" PROPERTIES LANGUAGE C)
+set_target_properties(test PROPERTIES LINKER_LANGUAGE C)
 
 # Check RPATH editing.
 set(CHECK1_OUT "${CMAKE_CURRENT_BINARY_DIR}/check1.out")
@@ -50,4 +52,3 @@ add_custom_target(check2 ALL
 	COMMAND diff ${CHECK2_OUT} ${CHECK2_REF}
 )
 add_dependencies(check2 patchelf test)
-
