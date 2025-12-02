@@ -52,3 +52,10 @@ add_custom_target(check2 ALL
 	COMMAND diff ${CHECK2_OUT} ${CHECK2_REF}
 )
 add_dependencies(check2 patchelf test)
+
+# Install targets
+install(TARGETS install_name_tool patchelf
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
